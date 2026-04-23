@@ -5,6 +5,22 @@ DEFAULT COLLATE utf8mb4_unicode_ci;
 
 USE meeting_booker;
 
+-- 创建用户表
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
+    password VARCHAR(255) NOT NULL COMMENT '密码（BCrypt加密）',
+    name VARCHAR(100) NOT NULL COMMENT '真实姓名',
+    email VARCHAR(100) NOT NULL UNIQUE COMMENT '邮箱',
+    role ENUM('ADMIN', 'USER') NOT NULL DEFAULT 'USER' COMMENT '角色',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE COMMENT '是否启用',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_username (username),
+    INDEX idx_email (email),
+    INDEX idx_role (role)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+
 -- 创建会议室表
 CREATE TABLE IF NOT EXISTS rooms (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -46,6 +62,14 @@ CREATE TABLE IF NOT EXISTS bookings (
     FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='预约表';
 
+-- 插入示例数据 - 用户
+-- 密码使用 BCrypt 加密
+-- admin / admin123
+-- user1 / user123
+INSERT INTO users (username, password, name, email, role, is_active) VALUES
+('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5E', '系统管理员', 'admin@example.com', 'ADMIN', TRUE),
+('user1', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5E', '张三', 'user1@example.com', 'USER', TRUE);
+
 -- 插入示例数据 - 会议室
 INSERT INTO rooms (floor, room_number, capacity, equipment, description, is_active) VALUES
 ('1F', '101', 10, '投影仪、白板、音响系统', '小型会议室，适合团队讨论', TRUE),
@@ -56,11 +80,11 @@ INSERT INTO rooms (floor, room_number, capacity, equipment, description, is_acti
 
 -- 插入示例数据 - 预约
 INSERT INTO bookings (room_id, applicant_name, applicant_email, meeting_title, description, participants, start_time, end_time, status) VALUES
-(1, '张三', 'zhangsan@example.com', '项目周会', '讨论本周项目进度和下周计划', 8, 
+(1, '张三', 'user1@example.com', '项目周会', '讨论本周项目进度和下周计划', 8, 
  DATE_ADD(CURDATE(), INTERVAL 10 HOUR), 
  DATE_ADD(CURDATE(), INTERVAL 11 HOUR), 
  'APPROVED'),
-(2, '李四', 'lisi@example.com', '产品评审会', '新产品需求评审', 15, 
+(2, '张三', 'user1@example.com', '产品评审会', '新产品需求评审', 15, 
  DATE_ADD(CURDATE(), INTERVAL 14 HOUR), 
  DATE_ADD(CURDATE(), INTERVAL 16 HOUR), 
  'PENDING');

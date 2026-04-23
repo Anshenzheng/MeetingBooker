@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { BookingService } from '../../services/booking.service';
 import { RoomService } from '../../services/room.service';
+import { AuthService } from '../../services/auth.service';
 import { Booking, BookingStatus, BookingCreate } from '../../models/booking.model';
 import { Room } from '../../models/room.model';
 
@@ -12,8 +13,8 @@ import { Room } from '../../models/room.model';
   imports: [CommonModule, FormsModule, ReactiveFormsModule],
   template: `
     <div class="page-header">
-      <h1 class="page-title">预约审核</h1>
-      <p class="page-subtitle">查看和审核会议室预约申请，管理预约状态</p>
+      <h1 class="page-title">预约管理</h1>
+      <p class="page-subtitle">创建和管理会议室预约申请</p>
     </div>
 
     <!-- 统计卡片 -->
@@ -103,11 +104,15 @@ import { Room } from '../../models/room.model';
               </td>
               <td>
                 <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                  <button *ngIf="booking.status === 'PENDING'" class="btn btn-success btn-sm" (click)="approveBooking(booking)">批准</button>
-                  <button *ngIf="booking.status === 'PENDING'" class="btn btn-danger btn-sm" (click)="openRejectModal(booking)">拒绝</button>
-                  <button *ngIf="booking.status === 'PENDING'" class="btn btn-outline btn-sm" (click)="viewDetails(booking)">详情</button>
-                  <button *ngIf="booking.status !== 'PENDING'" class="btn btn-outline btn-sm" (click)="viewDetails(booking)">查看</button>
-                  <button *ngIf="booking.status === 'PENDING' || booking.status === 'APPROVED'" class="btn btn-outline btn-sm" (click)="cancelBooking(booking)">取消</button>
+                  <button *ngIf="authService.isAdmin() && booking.status === 'PENDING'" class="btn btn-success btn-sm" (click)="approveBooking(booking)">批准</button>
+                  <button *ngIf="authService.isAdmin() && booking.status === 'PENDING'" class="btn btn-danger btn-sm" (click)="openRejectModal(booking)">拒绝</button>
+                  <button class="btn btn-outline btn-sm" (click)="viewDetails(booking)">查看</button>
+                  <button 
+                    *ngIf="(booking.status === 'PENDING' || booking.status === 'APPROVED') && canCancel(booking)" 
+                    class="btn btn-outline btn-sm" 
+                    (click)="cancelBooking(booking)">
+                    取消
+                  </button>
                 </div>
               </td>
             </tr>
@@ -161,19 +166,13 @@ import { Room } from '../../models/room.model';
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
               <div class="form-group">
-                <label class="form-label">申请人姓名 *</label>
-                <input type="text" class="form-control" formControlName="applicantName" placeholder="请输入申请人姓名">
-                <div *ngIf="bookingForm.get('applicantName')?.invalid && bookingForm.get('applicantName')?.touched" style="color: #ef4444; font-size: 12px; margin-top: 4px;">
-                  请输入申请人姓名
-                </div>
+                <label class="form-label">申请人</label>
+                <input type="text" class="form-control" [value]="currentUser?.name" disabled style="background-color: #f3f4f6;">
               </div>
 
               <div class="form-group">
-                <label class="form-label">申请人邮箱 *</label>
-                <input type="email" class="form-control" formControlName="applicantEmail" placeholder="请输入邮箱地址">
-                <div *ngIf="bookingForm.get('applicantEmail')?.invalid && bookingForm.get('applicantEmail')?.touched" style="color: #ef4444; font-size: 12px; margin-top: 4px;">
-                  请输入有效的邮箱地址
-                </div>
+                <label class="form-label">申请人邮箱</label>
+                <input type="email" class="form-control" [value]="currentUser?.email" disabled style="background-color: #f3f4f6;">
               </div>
             </div>
 
@@ -308,6 +307,7 @@ export class BookingsComponent implements OnInit {
   bookings: Booking[] = [];
   filteredBookings: Booking[] = [];
   rooms: Room[] = [];
+  currentUser: any = null;
   loading = false;
   filterStatus = '';
   showCreateModal = false;
@@ -331,13 +331,12 @@ export class BookingsComponent implements OnInit {
   constructor(
     private bookingService: BookingService,
     private roomService: RoomService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    public authService: AuthService
   ) {
     this.bookingForm = this.fb.group({
       roomId: ['', Validators.required],
       meetingTitle: ['', Validators.required],
-      applicantName: ['', Validators.required],
-      applicantEmail: ['', [Validators.required, Validators.email]],
       participants: [1, [Validators.required, Validators.min(1)]],
       startTime: ['', Validators.required],
       endTime: ['', Validators.required],
@@ -350,8 +349,16 @@ export class BookingsComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.currentUser = this.authService.getCurrentUser();
     this.loadRooms();
     this.loadBookings();
+  }
+
+  canCancel(booking: Booking): boolean {
+    if (this.authService.isAdmin()) {
+      return true;
+    }
+    return booking.applicantEmail === this.currentUser?.email;
   }
 
   loadRooms(): void {
@@ -402,8 +409,6 @@ export class BookingsComponent implements OnInit {
     this.bookingForm.reset({
       roomId: '',
       meetingTitle: '',
-      applicantName: '',
-      applicantEmail: '',
       participants: 1,
       startTime: '',
       endTime: '',
@@ -460,8 +465,8 @@ export class BookingsComponent implements OnInit {
     const bookingData: BookingCreate = {
       roomId: roomId,
       meetingTitle: formValue.meetingTitle,
-      applicantName: formValue.applicantName,
-      applicantEmail: formValue.applicantEmail,
+      applicantName: this.currentUser?.name || '',
+      applicantEmail: this.currentUser?.email || '',
       participants: participants,
       startTime: new Date(formValue.startTime).toISOString(),
       endTime: new Date(formValue.endTime).toISOString(),
@@ -483,7 +488,7 @@ export class BookingsComponent implements OnInit {
 
   approveBooking(booking: Booking): void {
     if (confirm(`确定要批准预约 "${booking.meetingTitle}" 吗？`)) {
-      this.bookingService.approveBooking(booking.id, '管理员').subscribe({
+      this.bookingService.approveBooking(booking.id, this.currentUser?.name || '管理员').subscribe({
         next: () => this.loadBookings(),
         error: (err) => alert(err.error?.message || '操作失败')
       });
