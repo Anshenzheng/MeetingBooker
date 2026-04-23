@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { RoomService } from '../../services/room.service';
+import { AuthService } from '../../services/auth.service';
 import { Room, RoomCreate } from '../../models/room.model';
 
 @Component({
@@ -17,7 +18,7 @@ import { Room, RoomCreate } from '../../models/room.model';
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">会议室列表</h2>
-        <button class="btn btn-primary" (click)="openCreateModal()">+ 添加会议室</button>
+        <button *ngIf="authService.isAdmin()" class="btn btn-primary" (click)="openCreateModal()">+ 添加会议室</button>
       </div>
 
       <div *ngIf="loading" class="loading">
@@ -27,7 +28,8 @@ import { Room, RoomCreate } from '../../models/room.model';
       <div *ngIf="!loading && rooms.length === 0" class="empty-state">
         <div class="empty-state-icon">🏢</div>
         <div class="empty-state-text">暂无会议室</div>
-        <div class="empty-state-hint">点击上方按钮添加第一个会议室</div>
+        <div class="empty-state-hint" *ngIf="authService.isAdmin()">点击上方按钮添加第一个会议室</div>
+        <div class="empty-state-hint" *ngIf="!authService.isAdmin()">请联系管理员添加会议室</div>
       </div>
 
       <div *ngIf="!loading && rooms.length > 0" class="table-responsive">
@@ -39,7 +41,7 @@ import { Room, RoomCreate } from '../../models/room.model';
               <th>容纳人数</th>
               <th>配套设备</th>
               <th>状态</th>
-              <th>操作</th>
+              <th *ngIf="authService.isAdmin()">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -53,7 +55,7 @@ import { Room, RoomCreate } from '../../models/room.model';
                   {{ room.isActive ? '启用' : '停用' }}
                 </span>
               </td>
-              <td>
+              <td *ngIf="authService.isAdmin()">
                 <div style="display: flex; gap: 8px;">
                   <button class="btn btn-outline btn-sm" (click)="openEditModal(room)">编辑</button>
                   <button *ngIf="room.isActive" class="btn btn-danger btn-sm" (click)="toggleStatus(room)">停用</button>
@@ -138,7 +140,8 @@ export class RoomsComponent implements OnInit {
 
   constructor(
     private roomService: RoomService,
-    private fb: FormBuilder
+    private fb: FormBuilder,
+    public authService: AuthService
   ) {
     this.roomForm = this.fb.group({
       floor: ['', Validators.required],
